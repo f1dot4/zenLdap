@@ -343,7 +343,6 @@ class ldapLogon {
 							$userobj->setGroup(implode(',',$groups));
 							$userobj->setRights($rights);
 							$userobj->setObjects($objects);
-							$userobj->setPass($user); //Used for Cookie (2nd Authentication)
 						}
 						break;
 					case 'defaultgroup':
@@ -360,7 +359,6 @@ class ldapLogon {
 								$userobj->setGroup($group);
 								$userobj->setRights($rights);
 								$userobj->setObjects($objects);
-								$userobj->setPass($user); //Used for Cookie 
 							}
 						}
 						break;
