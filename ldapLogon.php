@@ -184,15 +184,21 @@ class ldapLogon {
 	                        $res = ldap_search($ldapC,$ldapDc, $ldapCn,$ldapFilter) or die(ldap_error($ldapC));
 	                        $groups = ldap_get_entries($ldapC,$res);
 	                        ldap_close($ldapC);
-	                        $tmp=$groups[0]['memberof'];
-	                        $groups=array();
-	                        unset($tmp['count']);
-	                        foreach($tmp as $member) {
-	                                $t=explode(",",$member);
-	                                $t=explode("=",$t[0]);
-	                                array_push($groups,$t[1]);
-	                        }
-	                        return $groups;
+				if(array_key_exists('memberof',$groups[0]) ){
+		                        $tmp=$groups[0]['memberof'];
+		                        $groups=array();
+	        	                unset($tmp['count']);
+	                	        foreach($tmp as $member) {
+	                        	        $t=explode(",",$member);
+	                                	$t=explode("=",$t[0]);
+		                                array_push($groups,$t[1]);
+		                        }
+	        	                return $groups;
+				} else {
+					debugLog("Groups cannot be retrieved, check your LDAP-Settings, especially the DC, Reader, Readerpassword; Search called with: ldap_search($ldapC,$ldapDc, $ldapCn,$ldapFilter)");
+					
+					return array();
+				}
 			} else { 
 				debugLog("Cannot bind to LDAP-server:".ldap_error($ldapC));
 				ldap_close($ldapC);
@@ -226,17 +232,15 @@ class ldapLogon {
 					$result['groups'] = array_merge($result['groups'],self::getLdapGroupCnsOfUid($ldapServer,$ldapServerPort,$ldapDc,'memberUid='.$uid, array('cn')));
 				}
 			}
-			$result['user'] = $user;
-			$result['id'] = '';
-			$result['defaultgroup'] = $defaultZenGroup;
-			return $result;
 		} else if (($groups = self::getAdUserGroups($ldapServer,$ldapServerPort,$ldapDc,'cn='.$user)) && getOption('ldapType') == 'ldapTypeAD') {  //MS AD is used
 			$result['groups'] = array_merge($result['groups'],$groups);
+		}
+		if(getOption('ldapType')){ 
 			$result['user'] = $user;
-                        $result['id'] = '';
-                        $result['defaultgroup'] = $defaultZenGroup;
+        	        $result['id'] = '';
+                	$result['defaultgroup'] = $defaultZenGroup;
 			return $result;
-		} else { 
+		} else {
 			return NULL;
 		}
 	}
