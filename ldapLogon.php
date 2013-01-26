@@ -119,16 +119,19 @@ class ldapLogon {
 			return false;
 		}
 		if($ldapC = self::getLdapConnection($ldapServer,$ldapServerPort)) {
-			if(ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
+			if(@ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
 				$res = ldap_search($ldapC,$ldapDc, $ldapCn);
 				$user = ldap_get_entries($ldapC,$res);
 				unset($user[0]['uid']['count']);
 				ldap_close($ldapC);
 				return $user[0]['uid'];
 			} else {
+				debugLog("Cannot bind to LDAP-server:".ldap_error($ldapC));
+                                ldap_close($ldapC);
 				return false;
 			}
 		} else {
+			debugLog("Cannot connect to LDAP-server:".ldap_error($ldapC));
 			return false;
 		}
 	}
@@ -147,7 +150,7 @@ class ldapLogon {
 			return false;
 		}
 		if($ldapC = self::getLdapConnection($ldapServer,$ldapServerPort)) {
-			if(ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
+			if(@ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
 				$groups = array();
 				$res = ldap_search($ldapC,$ldapDc, $ldapUid, $ldapAttr);
 				$user = ldap_get_entries($ldapC,$res);
@@ -159,10 +162,13 @@ class ldapLogon {
 				ldap_close($ldapC);
 				return $groups;
 			} else {
+				debugLog("Cannot bind to LDAP-server:".ldap_error($ldapC));
+                                ldap_close($ldapC);
 				return false;
 			}
 		} else {
-				return false;
+			debugLog("Cannot connect to LDAP-server:".ldap_error($ldapC));
+			return false;
 		}
 	}	
 
@@ -176,7 +182,7 @@ class ldapLogon {
          */
 	static function getAdUserGroups($ldapServer, $ldapServerPort, $ldapDc, $ldapCn,$ldapFilter = array('memberof')) {
                 if($ldapC = self::getLdapConnection($ldapServer,$ldapServerPort)) {
-                        if(ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
+                        if(@ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
 	                        $res = ldap_search($ldapC,$ldapDc, $ldapCn,$ldapFilter) or die(ldap_error($ldapC));
 	                        $groups = ldap_get_entries($ldapC,$res);
 	                        ldap_close($ldapC);
@@ -190,9 +196,12 @@ class ldapLogon {
 	                        }
 	                        return $groups;
 			} else { 
+				debugLog("Cannot bind to LDAP-server:".ldap_error($ldapC));
+				ldap_close($ldapC);
 				return false;
 			}
                 } else {
+			debugLog("Cannot connect to LDAP-server:".ldap_error($ldapC));
                         return false;
                 }
         }
@@ -290,82 +299,86 @@ class ldapLogon {
 		$userobj = Zenphoto_Authority::getAnAdmin($searchfor);
 		if (!$userobj ) {
 			$result = ldapLogon::getExternalAuthArray(getOption('ldapServer'),getOption('ldapServerPort'),getOption('ldapDc'),$user,getOption('ldapZenDefaultTemplate'));
-			unset($result['id']);
-			unset($result['user']);
-			$authority = '';
-			//      create a transient user
-			$userobj = new Zenphoto_Administrator('', 1);
-			$userobj->setUser($user);
-			$userobj->setRights(NO_RIGHTS); //      just incase none get set
-			//      Flag as external credentials for completeness
-			$properties = array_keys($result);      //      the list of things we got from the external authority
-			array_unshift($properties, $auth);
-			$userobj->setCredentials($properties);
-			//      populate the user properties
-			$member = false;        //      no group membership (yet)
-			//echo "<pre>"; print_r($result); echo "</pre>";exitZP();
-			foreach ($result as $key=>$value) {
-				switch ($key) {
-					case 'authority':
-						$authority = '::'.$value;
-						unset($result['authority']);
-						break;
-					case 'groups':
-						//      find the corresponding Zenphoto group (if it exists)
-						$rights = NO_RIGHTS;
-						$objects = array();
-						$groups = $value;
-						foreach ($groups as $key=>$group) {
-							if (DEBUG_LOGIN){ debugLog("LDAP: Adding Group: $group"); }
-							$groupobj = Zenphoto_Authority::getAnAdmin(array('`user`=' => $group,'`valid`=' => 0));
-							if ($groupobj) {
-								$member = true;
-								$rights = $groupobj->getRights() | $rights;
-								$objects = array_merge($groupobj->getObjects(), $objects);
-								if ($groupobj->getName() == 'template') {
+			if($result){
+				unset($result['id']);
+				unset($result['user']);
+				$authority = '';
+				//      create a transient user
+				$userobj = new Zenphoto_Administrator('', 1);
+				$userobj->setUser($user);
+				$userobj->setRights(NO_RIGHTS); //      just incase none get set
+				//      Flag as external credentials for completeness
+				$properties = array_keys($result);      //      the list of things we got from the external authority
+				array_unshift($properties, $auth);
+				$userobj->setCredentials($properties);
+				//      populate the user properties
+				$member = false;        //      no group membership (yet)
+				//echo "<pre>"; print_r($result); echo "</pre>";exitZP();
+				foreach ($result as $key=>$value) {
+					switch ($key) {
+						case 'authority':
+							$authority = '::'.$value;
+							unset($result['authority']);
+							break;
+						case 'groups':
+							//      find the corresponding Zenphoto group (if it exists)
+							$rights = NO_RIGHTS;
+							$objects = array();
+							$groups = $value;
+							foreach ($groups as $key=>$group) {
+								if (DEBUG_LOGIN){ debugLog("LDAP: Adding Group: $group"); }
+								$groupobj = Zenphoto_Authority::getAnAdmin(array('`user`=' => $group,'`valid`=' => 0));
+								if ($groupobj) {
+									$member = true;
+									$rights = $groupobj->getRights() | $rights;
+									$objects = array_merge($groupobj->getObjects(), $objects);
+									if ($groupobj->getName() == 'template') {
+										unset($groups[$key]);
+									}
+								} else {
 									unset($groups[$key]);
 								}
-							} else {
-								unset($groups[$key]);
 							}
-						}
-						if ($member) {
-							$userobj->setGroup(implode(',',$groups));
-							$userobj->setRights($rights);
-							$userobj->setObjects($objects);
-						}
-						break;
-					case 'defaultgroup':
-						if (!$member && isset($result['defaultgroup'])) {
-							//      No Zenphoto group, use the default group
-							$group = $result['defaultgroup'];
-							$groupobj = Zenphoto_Authority::getAnAdmin(array('`user`=' => $group,'`valid`=' => 0));
-							if ($groupobj) {
-								$rights = $groupobj->getRights();
-								$objects = $groupobj->getObjects();
-								if ($groupobj->getName() != 'template') {
-									$group = NULL;
-								}
-								$userobj->setGroup($group);
+							if ($member) {
+								$userobj->setGroup(implode(',',$groups));
 								$userobj->setRights($rights);
 								$userobj->setObjects($objects);
 							}
-						}
-						break;
-					case 'objects':
-						$userobj->setObjects($objects);
-						break;
-					case 'album':
-						$userobj->createPrimealbum(false, $value);
-						break;
-					default:
-						$userobj->set($key,$value);
-						break;
+							break;
+						case 'defaultgroup':
+							if (!$member && isset($result['defaultgroup'])) {
+								//      No Zenphoto group, use the default group
+								$group = $result['defaultgroup'];
+								$groupobj = Zenphoto_Authority::getAnAdmin(array('`user`=' => $group,'`valid`=' => 0));
+								if ($groupobj) {
+									$rights = $groupobj->getRights();
+									$objects = $groupobj->getObjects();
+									if ($groupobj->getName() != 'template') {
+										$group = NULL;
+									}
+									$userobj->setGroup($group);
+									$userobj->setRights($rights);
+									$userobj->setObjects($objects);
+								}
+							}
+							break;
+						case 'objects':
+							$userobj->setObjects($objects);
+							break;
+						case 'album':
+							$userobj->createPrimealbum(false, $value);
+							break;
+						default:
+							$userobj->set($key,$value);
+							break;
+					}
 				}
+				$properties = array_keys($result);      //      the list of things we got from the external authority
+				array_unshift($properties, $auth.$authority);
+				$userobj->setCredentials($properties);
+			} else {
+				$userobj = NULL;
 			}
-			$properties = array_keys($result);      //      the list of things we got from the external authority
-			array_unshift($properties, $auth.$authority);
-			$userobj->setCredentials($properties);
 		} else {
 			$userobj = NULL;	// User exists in local DB, should be authenticated before
 		}	
