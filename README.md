@@ -1,0 +1,4 @@
+zenLdap
+=======
+
+Zenphoto LDAP plugin
