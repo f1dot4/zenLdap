@@ -18,8 +18,3 @@ Basically you have to use zenphoto-groups (with the zenplugin user_groups).
 The same groups have to exist in the LDAP-Directory too (same group-name only).
 During the login, the plugin receives the groups of the user. If there is a match between LDAP-group and Zenphoto-group, the zenphoto-group rights will be merged into the LDAP-user.
 If there is no match, a default-template can be defined on the plugins-Option page, than those rights will be used for the user.
-
-Known limitations
-=================
-There is a problem when editing anything on the admin-page with an ldap-user. 
-Every action is recognized as cross-site scripting and will be blocked.
