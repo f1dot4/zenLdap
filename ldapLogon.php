@@ -1,18 +1,19 @@
 <?php
-/* Adds a ldap properties to zenphoto*/
+/* Adds LDAP authentication to zenphoto
+ * For more information read the REAMDE that can be found under https://github.com/spelth/zenLdap/blob/master/README.md
+ * This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+ */
 
 /* Zenphoto stuff */
 $plugin_description = "LDAP Logon properties";
 $plugin_author = "Lukas Leidinger";
-$plugin_version = "2.1";
-$plugin_URL = "";
+$plugin_version = "2.2";
+$plugin_URL = "https://github.com/spelth/zenLdap";
 $plugin_is_filter = 2|CLASS_PLUGIN;
 $option_interface = "ldapLogon";
 
-zp_register_filter('','ldapLogon::getLdapZenUsers');
-zp_register_filter('','ldapLogon::authenticateLdapUser');
-zp_register_filter('','ldapLogon::checkUserIsInGroup');
-zp_register_filter('','ldapLogon::load');
+zp_register_filter('','ldapLogon::checkLogon');
+zp_register_filter('','ldapLogon::getLogon');
 
 class ldapLogon {
 	function ldapLogon(){
@@ -20,9 +21,9 @@ class ldapLogon {
 		setOptionDefault('ldapType', 0);
 		setOptionDefault('ldapServer', '192.168.1.14');
 		setOptionDefault('ldapServerPort','389');
-		setOptionDefault('ldapDc','dc=domain');
+		setOptionDefault('ldapDc','dc=DOMAIN');
 		setOptionDefault('ldapOu','ou=Users');
-		setOptionDefault('ldapRdrDn','cn=reader,dc=loww');
+		setOptionDefault('ldapRdrDn','cn=reader,dc=DOMAIN');
 		setOptionDefault('ldapRdrPass','test');
 		setOptionDefault('ldapZenDefaultTemplate','extern');
 		setOption('zp_plugin_ldapLogon','4096');
@@ -83,10 +84,6 @@ class ldapLogon {
 	function handleOption($option, $currentValue) {
   	}
 
-	static function load(){
-		debugLog('LDAP load() called');
-	}
-
 	/*
 	 * returns a LDAP connection
 	 */
@@ -143,6 +140,7 @@ class ldapLogon {
 	 * @param ldapServerPort
 	 * @param ldapDc in format 'dc=domain' or 'dc=domain,dc=tld'
 	 * @param ldapUid in format 'memberUid=user'
+	 * @param ldapAttr
 	 */
 	static function getLdapGroupCnsOfUid($ldapServer,$ldapServerPort,$ldapDc,$ldapUid , $ldapAttr = "") {
 		if($ldapServer == NULL || $ldapServerPort == NULL || $ldapDc == NULL || $ldapUid == NULL || $ldapAttr == NULL) {
@@ -211,8 +209,8 @@ class ldapLogon {
 	 * @param ldapServer
 	 * @param ldapServerPort
 	 * @param ldapDc in format 'dc=domain' or 'dc=domain,dc=tld'
-	 * @param ldapCn in format 'cn=user'
 	 * @param user is the string from the login-textbox
+	 * @param defaultZenGroup is the default template that should be used when no group matches
 	 */
 	static function getExternalAuthArray($ldapServer,$ldapServerPort,$ldapDc, $user, $defaultZenGroup) {
 		if($ldapServer == NULL || $ldapServerPort == NULL || $ldapDc == NULL || $user == NULL) {
@@ -303,17 +301,13 @@ class ldapLogon {
 				unset($result['id']);
 				unset($result['user']);
 				$authority = '';
-				//      create a transient user
 				$userobj = new Zenphoto_Administrator('', 1);
 				$userobj->setUser($user);
-				$userobj->setRights(NO_RIGHTS); //      just incase none get set
-				//      Flag as external credentials for completeness
-				$properties = array_keys($result);      //      the list of things we got from the external authority
+				$userobj->setRights(NO_RIGHTS);
+				$properties = array_keys($result);
 				array_unshift($properties, $auth);
 				$userobj->setCredentials($properties);
-				//      populate the user properties
-				$member = false;        //      no group membership (yet)
-				//echo "<pre>"; print_r($result); echo "</pre>";exitZP();
+				$member = false; 
 				foreach ($result as $key=>$value) {
 					switch ($key) {
 						case 'authority':
@@ -321,7 +315,6 @@ class ldapLogon {
 							unset($result['authority']);
 							break;
 						case 'groups':
-							//      find the corresponding Zenphoto group (if it exists)
 							$rights = NO_RIGHTS;
 							$objects = array();
 							$groups = $value;
@@ -347,7 +340,6 @@ class ldapLogon {
 							break;
 						case 'defaultgroup':
 							if (!$member && isset($result['defaultgroup'])) {
-								//      No Zenphoto group, use the default group
 								$group = $result['defaultgroup'];
 								$groupobj = Zenphoto_Authority::getAnAdmin(array('`user`=' => $group,'`valid`=' => 0));
 								if ($groupobj) {
@@ -373,14 +365,14 @@ class ldapLogon {
 							break;
 					}
 				}
-				$properties = array_keys($result);      //      the list of things we got from the external authority
+				$properties = array_keys($result);
 				array_unshift($properties, $auth.$authority);
 				$userobj->setCredentials($properties);
 			} else {
 				$userobj = NULL;
 			}
 		} else {
-			$userobj = NULL;	// User exists in local DB, should be authenticated before
+			$userobj = NULL;	// User exists in local DB, it should be authenticated before, some error?
 		}	
 		if (isset($result['logout_link'])) {
 			$userobj->logout_link = $result['logout_link'];
