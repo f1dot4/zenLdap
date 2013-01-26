@@ -15,7 +15,7 @@ zp_register_filter('','ldapLogon::checkUserIsInGroup');
 zp_register_filter('','ldapLogon::load');
 
 class ldapLogon {
-  function ldapLogon(){
+	function ldapLogon(){
 		setOptionDefault('ldapEnabled', 1);
 		setOptionDefault('ldapType', 0);
 		setOptionDefault('ldapServer', '192.168.1.14');
@@ -122,7 +122,6 @@ class ldapLogon {
 			if(ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
 				$res = ldap_search($ldapC,$ldapDc, $ldapCn);
 				$user = ldap_get_entries($ldapC,$res);
-				//debugLog('LDAP return cn=\''.$user[0]['cn'][0].'\' uid=\''.$ldapUid.'\'');
 				unset($user[0]['uid']['count']);
 				ldap_close($ldapC);
 				return $user[0]['uid'];
@@ -150,10 +149,8 @@ class ldapLogon {
 		if($ldapC = self::getLdapConnection($ldapServer,$ldapServerPort)) {
 			if(ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
 				$groups = array();
-				//$ldapAttr = array('cn');
 				$res = ldap_search($ldapC,$ldapDc, $ldapUid, $ldapAttr);
 				$user = ldap_get_entries($ldapC,$res);
-				//debugLog('LDAP return cn=\''.$user[0]['cn'][0].'\' uid=\''.$ldapUid.'\'');
 				for($i=0;$i < count($user); $i++) {
 						if(!empty($user[$i]['cn']['0'])) {
 								$groups[$i] = $user[$i]['cn']['0'];
@@ -178,7 +175,6 @@ class ldapLogon {
          * @param ldapFilter is the ldap-filter attribute, typically "memberof"
          */
 	static function getAdUserGroups($ldapServer, $ldapServerPort, $ldapDc, $ldapCn,$ldapFilter = array('memberof')) {
-		//echo "getAdUserGroups($ldapServer, $ldapServerPort, $ldapDc, $ldapCn,$ldapFilter)";
                 if($ldapC = self::getLdapConnection($ldapServer,$ldapServerPort)) {
                         if(ldap_bind($ldapC, getOption('ldapRdrDn'), getOption('ldapRdrPass'))) {
 	                        $res = ldap_search($ldapC,$ldapDc, $ldapCn,$ldapFilter) or die(ldap_error($ldapC));
@@ -220,7 +216,6 @@ class ldapLogon {
 		if(getOption('ldapType') == 'ldapTypeOL' && $ldapUids = self::getLdapUidsOfCn($ldapServer,$ldapServerPort,$ldapDc,'cn='.$user)) { // OpenLDAP is used
 			foreach($ldapUids as $uid) {
 				if(count(self::getLdapGroupCnsOfUid($ldapServer,$ldapServerPort,$ldapDc,'memberUid='.$uid, array('cn')))) {
-					//foreach(self::getLdapGroupCnsOfUid($ldapServer,$ldapServerPort,$ldapDc,'memberUid='.$uid, array('cn')) as $a){ echo "<pre>"; debugLog('GROUP='.$a); echo "</pre>";}
 					$result['groups'] = array_merge($result['groups'],self::getLdapGroupCnsOfUid($ldapServer,$ldapServerPort,$ldapDc,'memberUid='.$uid, array('cn')));
 				}
 			}
@@ -251,18 +246,14 @@ class ldapLogon {
 			debugLog('LDAP: function autenticateLdapUser() called with at least one invalid argument! (ldapPass is allowed to be empty)');
 			return false;
 		}
-		//debugLog('LDAP: called function authtenticateLdapUser('.$ldapServer.','.$ldapServerPort.','.$ldapRdn.',PASS_NOT_SHOWN)');
 		if($ldapC = self::getLdapConnection($ldapServer,$ldapServerPort)) {
 			if (DEBUG_LOGIN) { debugLog('LDAP Bind: ldap_bind('.$ldapC.', '.$ldapRdn.' ,'.$ldapPass.')'); }
-			 debugLog('LDAP Bind: ldap_bind('.$ldapC.', '.$ldapRdn.' ,'.$ldapPass.')');
 			$ldapB = @ldap_bind($ldapC, $ldapRdn ,$ldapPass);
 			if($ldapB) {
 				if (DEBUG_LOGIN) { debugLog('LDAP authentication for \''. $ldapRdn.'\' successfull'); }
-				debugLog('LDAP authentication for \''. $ldapRdn.'\' successfull'); 
 				return ($ldapC);
 			} else {
 				if (DEBUG_LOGIN) { debugLog('LDAP bind failed for \''. $ldapRdn); }
-				debugLog('LDAP bind failed for \''. $ldapRdn);
 				ldap_close($ldapC);
 				return false;
 			}
@@ -325,13 +316,12 @@ class ldapLogon {
 						$objects = array();
 						$groups = $value;
 						foreach ($groups as $key=>$group) {
-							debugLog("Adding Group: $group");
+							if (DEBUG_LOGIN){ debugLog("LDAP: Adding Group: $group"); }
 							$groupobj = Zenphoto_Authority::getAnAdmin(array('`user`=' => $group,'`valid`=' => 0));
 							if ($groupobj) {
 								$member = true;
 								$rights = $groupobj->getRights() | $rights;
 								$objects = array_merge($groupobj->getObjects(), $objects);
-								debugLog("Group Name:". $groupobj->getName());
 								if ($groupobj->getName() == 'template') {
 									unset($groups[$key]);
 								}
