@@ -30,4 +30,10 @@ Troubleshooting
 * Use the tool "ldapsearch" to check your configured LDAP-properties on the plugin-option-page.
 * "ldapsearch -h HOSTNAME -b 'dc=DOMAIN' -D 'cn=reader,dc=DOMAIN' -W -x" this will promt for the reader-password and then prints out lots of LDAP-stuff. The content of the -D option: cn=reader,dc=DOMAIN is right one for the "LDAP Reader DN"-textbox on the plugin-option-page
 
+Known Problems
+==============
+Due to some reasons some images won't be created in the cache when the plugin is activated
+
+Additional
+==========
 This plugin is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
