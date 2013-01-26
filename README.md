@@ -1,7 +1,7 @@
 zenLdap Introduction
 ====================
 This is a Zenphoto-plugin that allows an LDAP-authentication against Microsoft Active Directory and OpenLDAP.
-The login-function checks first if there is a local-db user available (for the given login-data), if not, it tries to authenticate against the LDAP-directory
+The login-function checks first if there is a local-db user available (for the given credentials), if not, it will try to authenticate against the given LDAP-directory
 
 Setup
 =====
@@ -18,7 +18,14 @@ and place the alternative lib-auth.php in the alt-folder.
 
 How it works
 ============
-Basically you have to use zenphoto-groups (with the zenplugin user_groups).
-The same groups have to exist in the LDAP-Directory too (same group-name only).
+Basically you have to create and configure zenphoto-groups (through the zenplugin user_groups).
+The zen-groups have to exist in the LDAP-Directory too (same group-name only).
 During the login, the plugin receives the groups of the user. If there is a match between LDAP-group and Zenphoto-group, the zenphoto-group rights will be merged into the LDAP-user.
-If there is no match, a default-template can be defined on the plugins-Option page, than those rights will be used for the user.
+If there is no match, a default-template can be defined on the plugin-option page, than those rights will be used for the user.
+
+Troubleshooting
+===============
+* Use the local-DB admin user to display the "debug.log" on the admin-page. It is most likely that there are some troubles regarding the given LDAP data.
+* When creating a new OpenLDAP-user, you will have to use the user first somewhere else before you can use it as the Zenphoto-LDAP login (e.g. login into phpLDAPadmin)
+* Use the tool "ldapsearch" to check your configured LDAP-properties on the plugin-option-page.
+* "ldapsearch -h HOSTNAME -b 'dc=DOMAIN' -D 'cn=reader,dc=DOMAIN' -W -x" this will promt for the reader-password and then prints out lots of LDAP-stuff. The content of the -D option: cn=reader,dc=DOMAIN is right one for the "LDAP Reader DN"-textbox on the plugin-option-page
