@@ -1,0 +1,84 @@
+--- lib-auth-1.4.4.php	2017-04-07 08:26:03.185947438 +0200
++++ lib-auth.php	2017-04-07 08:21:20.797953158 +0200
+@@ -41,7 +41,11 @@
+  * @package classes
+  */
+ // force UTF-8 Ø
+-require_once(dirname(__FILE__).'/classes.php');
++require_once(dirname(__FILE__).'/../../zp-core/classes.php');
++
++/* create the global $_zp_authority object */
++global $_zp_authority;
++$_zp_authority = new Zenphoto_Authority();
+ 
+ class Zenphoto_Authority {
+ 
+@@ -241,6 +245,9 @@
+ 	function checkAuthorization($authCode, $id) {
+ 		global $_zp_current_admin_obj;
+ 		if (DEBUG_LOGIN) { debugLogBacktrace("checkAuthorization($authCode, $id)");	}
++		if(getOption('ldapEnabled') && ldapLogon::getLogon($id)){ 
++			return $_zp_current_admin_obj->getRights(); 
++		}
+ 		$admins = $this->getAdministrators();
+ 		if (count($admins) == 0) {
+ 			if (DEBUG_LOGIN) { debugLog("checkAuthorization: no admins"); }
+@@ -628,12 +635,22 @@
+ 			switch (@$_POST['password']) {
+ 				default:
+ 					$user = self::checkLogon($post_user, $post_pass);
++					if (getOption('ldapEnabled') ) { $userext = ldapLogon::checkLogon($post_user, $post_pass); }
+ 					if ($user) {
+ 						$_zp_loggedin = $user->getRights();
++						} else if (getOption('ldapEnabled') && $userext) {
++							$user = $userext;
++							$_zp_loggedin = $user->getRights();
++							if($_zp_loggedin == 1) {
++								$_zp_loggedin = 0; //No group and no default template set 
++							}
+ 					}
+ 					$_zp_loggedin = zp_apply_filter('admin_login_attempt', $_zp_loggedin, $post_user, $post_pass);
+ 					if ($_zp_loggedin) {
+ 						self::logUser($user);
++						if($user->getID() == -1) {
++							zp_setCookie("zp_user_auth_ldap",$post_user, NULL, NULL, secureServer());
++						}
+ 						$_zp_current_admin_obj = $user;
+ 					} else {
+ 						zp_clearCookie("zp_user_auth");	// Clear the cookie, just in case
+@@ -655,7 +672,7 @@
+ 					break;
+ 				case 'captcha':
+ 					if ($_zp_captcha->checkCaptcha(trim(@$_POST['code']), sanitize(@$_POST['code_h'],3))) {
+-						require_once(dirname(__FILE__).'/load_objectClasses.php'); // be sure that the plugins are loaded for the mail handler
++                                                require_once(dirname(__FILE__).'/../../zp-core/load_objectClasses.php'); // be sure that the plugins are loaded for the mail handler
+ 						if (empty($post_user)) {
+ 							$requestor = gettext('You are receiving this e-mail because of a password reset request on your Zenphoto gallery.');
+ 						} else {
+@@ -1508,7 +1525,7 @@
+ 				}
+ 				switch ($object['type']) {
+ 					case 'album':
+-						$album = new Album(NULL, $object['data']);
++						$album = newAlbum($object['data']);
+ 						$albumid = $album->getID();
+ 						$sql = "INSERT INTO ".prefix('admin_to_object')." (adminid, objectid, type, edit) VALUES ($id, $albumid, 'albums', $edit)";
+ 						$result = query($sql);
+@@ -1564,7 +1581,7 @@
+ 			$sql = 'SELECT `folder` FROM '.prefix('albums').' WHERE `id`='.$id;
+ 			$result = query_single_row($sql);
+ 			if ($result) {
+-				$album = new Album(NULL, $result['folder']);
++				$album = newAlbum($result['folder']);
+ 				return $album;
+ 			}
+ 		}
+@@ -1617,7 +1634,7 @@
+ 		$path = ALBUM_FOLDER_SERVERPATH.$filename.$ext;
+ 		$albumname = filesystemToInternal($filename.$ext);
+ 		if (@mkdir_recursive($path,FOLDER_MOD)) {
+-			$album = new Album(NULL, $albumname);
++			$album = newAlbum($albumname);
+ 			if ($title = $this->getName()) {
+ 				$album->setTitle($title);
+ 			}
