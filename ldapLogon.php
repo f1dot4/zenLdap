@@ -16,7 +16,7 @@ zp_register_filter('','ldapLogon::checkLogon');
 zp_register_filter('','ldapLogon::getLogon');
 
 class ldapLogon {
-	function ldapLogon(){
+	function __construct(){
 		setOptionDefault('ldapEnabled', 1);
 		setOptionDefault('ldapType', 0);
 		setOptionDefault('ldapServer', '192.168.1.14');
