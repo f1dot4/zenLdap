@@ -143,7 +143,7 @@ class ldapLogon {
 
 		$ldapObject = self::getLdapObjects($ldapServer, $ldapServerPort, $ldapSearchBase,
 			"(&".getOption('ldapUserFilter')."(".getOption('ldapLoginAttribute')."=$user))");
-		if ($ldapObject != false){
+		if ($ldapObject != false && isset($ldapObject[0]['memberof'])){
 			foreach ($ldapObject[0]['memberof'] as $group){
 				$group = preg_replace("/,.*$/", "", $group);
 				$group = preg_replace("/^.*=/", "", $group);
@@ -151,6 +151,7 @@ class ldapLogon {
 			}
 		}
 		$result['user'] = $user;
+		$result['dn'] = $ldapObject[0]['dn'];
 		$result['id'] = $ldapObject[0][getOption('ldapAuthAttribute')][0];
 		$result['defaultgroup'] = $defaultZenGroup;
 		debugLog("LDAP: \$result: ".var_export($result, true));
@@ -214,6 +215,8 @@ class ldapLogon {
 		if (!$userobj) {
 			$result = ldapLogon::getExternalAuthArray(getOption('ldapServer'),getOption('ldapServerPort'),getOption('ldapSearchBase'),$user,getOption('ldapZenDefaultTemplate'));
 			if($result){
+                                $ldapRdn = $result['dn'];
+                                unset($result['dn']);
 				$user = $result['id'];
 				unset($result['id']);
 				unset($result['user']);
@@ -297,8 +300,8 @@ class ldapLogon {
 			$userobj->logout_link = $result['logout_link'];
 		}
 		if ($pass != NULL && $userobj) {
-			$ldapRdn = getOption("ldapAuthAttribute").'='.$user.','.getOption('ldapSearchBase');
 			if(!ldapLogon::authenticateLdapUser(getOption('ldapServer'), getOption('ldapServerPort'), $ldapRdn, $pass)) {
+                                debugLog("LDAP: wrong password");
 				$userobj = NULL;
 			}
 		}
@@ -306,4 +309,3 @@ class ldapLogon {
 		return $userobj;
 	}
 }
-?>
