@@ -12,14 +12,14 @@ Install the php-ldap extension, if you have apt:
 The plugin php script ldap_logon.php must be placed in "<zenphoto-directory>/plugins/ldap_logon.php".
 In addition the lib-auth.php must be replaced - to do this create a folder named "alt" in the plugins directory
 
- "mkdir <zenphoto-directory>/alt/plugins/alt/"
+ "mkdir &lt;zenphoto-directory&gt;/plugins/alt/"
  
 and place the alternative lib-auth.php in the alt-folder.
 
 How it works
 ============
 Basically you have to create and configure zenphoto-groups (through the zenplugin user_groups).
-The zen-groups have to exist in the LDAP-Directory too (same group-name only).
+The zen-groups are read from both the memberOf attribute of the user and the cn attribute of group entries if the server doesn't support memberOf overlay.
 During the login, the plugin receives the groups of the user. If there is a match between LDAP-group and Zenphoto-group, the zenphoto-group rights will be merged into the LDAP-user.
 If there is no match, a default-template can be defined on the plugin-option page, than those rights will be used for the user.
 

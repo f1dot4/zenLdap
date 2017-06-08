@@ -24,6 +24,7 @@ class ldapLogon {
 		setOptionDefault('ldapLoginAttribute','cn');
 		setOptionDefault('ldapAuthAttribute','cn');
 		setOptionDefault('ldapUserFilter','');
+		setOptionDefault('ldapGroupBase','');
 		setOptionDefault('ldapReaderDn','cn=reader,dc=example,dc=com');
 		setOptionDefault('ldapReaderPass','test');
 		setOptionDefault('ldapZenDefaultTemplate','extern');
@@ -66,19 +67,24 @@ class ldapLogon {
 								'order' => 6,
 								'desc' => gettext("Set an additional filter for users (e.g.: (memberOf=cn=zenphoto-user,cn=groups,cn=accounts,dc=example,dc=com) to only allow users that are members of the zenphoto-user LDAP group to log in)"),
 							),
-			gettext('LDAP Reader DN') => array('key' => 'ldapReaderDn',
+			gettext('LDAP Groups Search Base') => array('key' => 'ldapGroupBase',
 								'type' => OPTION_TYPE_TEXTBOX,
 								'order' => 7,
+								'desc' => gettext("Set the LDAP search base for groups (groupOfNames or groupOfUniqueNames objectClasses), optional"),
+							),
+			gettext('LDAP Reader DN') => array('key' => 'ldapReaderDn',
+								'type' => OPTION_TYPE_TEXTBOX,
+								'order' => 8,
 								'desc' => gettext("Set the DN of an LDAP-user with read permissions for the user and group objects"),
 							),
 			gettext('LDAP Reader Password') => array('key' => 'ldapReaderPass',
 								'type' => OPTION_TYPE_PASSWORD,
-								'order' => 8,
+								'order' => 9,
 								'desc' => gettext("Password of the LDAP-User with read permissions for the user and group objects"),
 							),
 			gettext('Default template') => array('key' => 'ldapZenDefaultTemplate',
 								'type' => OPTION_TYPE_TEXTBOX,
-								'order' => 9,
+								'order' => 10,
 								'desc' => gettext("Template that should be used when no ldap zen-group is available")
 							)
 		);
@@ -143,14 +149,32 @@ class ldapLogon {
 
 		$ldapObject = self::getLdapObjects($ldapServer, $ldapServerPort, $ldapSearchBase,
 			"(&".getOption('ldapUserFilter')."(".getOption('ldapLoginAttribute')."=$user))");
-		if ($ldapObject != false){
+                // Groups from memberOf attribute (as in Active Directory or
+                // OpenLDAP with the memberof overlay)
+		if ($ldapObject != false && !empty($ldapObject[0]['memberof'])){
 			foreach ($ldapObject[0]['memberof'] as $group){
 				$group = preg_replace("/,.*$/", "", $group);
 				$group = preg_replace("/^.*=/", "", $group);
-				$result['groups'] = array_merge($result['groups'], array("$group"));
+				$result['groups'][] = strtolower($group);
 			}
 		}
+                $dn = $ldapObject[0]['dn'];
+                // Groups from a direct search (as in Sun/Oracle Directory Server or old OpenLDAP)
+                if (!empty(getOption('ldapGroupBase'))) {
+                    $ldapGroups = self::getLdapObjects($ldapServer, $ldapServerPort, getOption('ldapGroupBase'),
+                            "(|(member=$dn)(uniqueMember=$dn))");
+                    foreach ($ldapGroups as $group) {
+                        if (empty($group['cn'])) {
+                            continue;
+                        }
+                        foreach ($group['cn'] as $cn) {
+                            $result['groups'][] = strtolower($cn);
+                        }
+                    }
+                }
+                $result['groups'] = array_unique($result['groups']);
 		$result['user'] = $user;
+		$result['dn'] = $dn;
 		$result['id'] = $ldapObject[0][getOption('ldapAuthAttribute')][0];
 		$result['defaultgroup'] = $defaultZenGroup;
 		debugLog("LDAP: \$result: ".var_export($result, true));
@@ -214,6 +238,8 @@ class ldapLogon {
 		if (!$userobj) {
 			$result = ldapLogon::getExternalAuthArray(getOption('ldapServer'),getOption('ldapServerPort'),getOption('ldapSearchBase'),$user,getOption('ldapZenDefaultTemplate'));
 			if($result){
+                                $ldapRdn = $result['dn'];
+                                unset($result['dn']);
 				$user = $result['id'];
 				unset($result['id']);
 				unset($result['user']);
@@ -297,8 +323,8 @@ class ldapLogon {
 			$userobj->logout_link = $result['logout_link'];
 		}
 		if ($pass != NULL && $userobj) {
-			$ldapRdn = getOption("ldapAuthAttribute").'='.$user.','.getOption('ldapSearchBase');
 			if(!ldapLogon::authenticateLdapUser(getOption('ldapServer'), getOption('ldapServerPort'), $ldapRdn, $pass)) {
+                                debugLog("LDAP: wrong password");
 				$userobj = NULL;
 			}
 		}
@@ -306,4 +332,3 @@ class ldapLogon {
 		return $userobj;
 	}
 }
-?>
